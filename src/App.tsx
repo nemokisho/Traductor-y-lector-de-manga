@@ -48,6 +48,8 @@ export default function App() {
   const [collections, setCollections] = useState<any[]>([]);
   const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
   const [librarySearchQuery, setLibrarySearchQuery] = useState("");
+  const libraryScrollRef = useRef<number>(0);
+  const libraryContainerRef = useRef<HTMLDivElement>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
   const [importCollectionName, setImportCollectionName] = useState("");
   const [importProgress, setImportProgress] = useState<{ current: number; total: number; status: string } | null>(null);
@@ -340,7 +342,22 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (view === 'home' && libraryContainerRef.current) {
+      // Small delay to ensure the grid has rendered
+      requestAnimationFrame(() => {
+        if (libraryContainerRef.current) {
+          libraryContainerRef.current.scrollTop = libraryScrollRef.current;
+        }
+      });
+    }
+  }, [view]);
+
   const loadFromLibrary = async (manga: any) => {
+    // Save current scroll position before switching view
+    if (libraryContainerRef.current) {
+      libraryScrollRef.current = libraryContainerRef.current.scrollTop;
+    }
     setIsLoading(true);
     try {
       const res = await fetch(`/api/library/${manga.id}`);
@@ -466,6 +483,11 @@ export default function App() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const backToLibrary = () => {
+    setPages([]);
+    setView('home');
+  };
+
   if (view === 'home') {
     return (
       <div className="min-h-screen bg-[#050505] text-zinc-100 flex overflow-hidden relative">
@@ -502,8 +524,8 @@ export default function App() {
         </AnimatePresence>
 
         {/* Collections Sidebar */}
-        <div className="w-64 bg-[#0a0a0a] border-r border-zinc-800 flex flex-col hidden md:flex">
-          <div className="p-6 border-b border-zinc-800 space-y-4">
+        <div className="w-64 bg-[#0a0a0a]/50 backdrop-blur-xl border-r border-zinc-800/50 flex flex-col hidden md:flex z-40">
+          <div className="p-6 border-b border-zinc-800/50 space-y-4">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <BookOpen className="w-5 h-5 text-indigo-400" />
               Librería
@@ -605,7 +627,7 @@ export default function App() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar Library */}
-          <div className="h-16 border-b border-zinc-800 flex items-center justify-between px-6 bg-[#050505]/80 backdrop-blur-xl z-20">
+          <div className="sticky top-0 h-16 border-b border-zinc-800/50 flex items-center justify-between px-6 bg-[#050505]/60 backdrop-blur-2xl z-30 shadow-xl shadow-black/20">
             <div className="flex items-center gap-4 flex-1">
               <h2 className="text-lg font-semibold text-white whitespace-nowrap">
                 {selectedCollectionId ? collections.find(c => c.id === selectedCollectionId)?.name : "Todos los Mangas"}
@@ -664,7 +686,7 @@ export default function App() {
               </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 sm:p-10 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 sm:p-10 custom-scrollbar" ref={libraryContainerRef}>
             <AnimatePresence mode="wait">
               {filePreviews.length > 0 ? (
                 <motion.div
@@ -857,7 +879,7 @@ export default function App() {
           >
             <div className="p-4 border-bottom border-zinc-800 flex items-center justify-between">
               <span className="font-semibold text-sm uppercase tracking-wider text-zinc-500">Páginas ({pages.length})</span>
-              <button onClick={() => { setPages([]); setView('home'); }} title="Volver a Biblioteca" className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400">
+              <button onClick={backToLibrary} title="Volver a Biblioteca" className="p-2 hover:bg-zinc-800 rounded-lg transition-colors text-zinc-400">
                 <History className="w-4 h-4" />
               </button>
             </div>
