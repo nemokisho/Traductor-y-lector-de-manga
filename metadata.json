@@ -1,0 +1,6 @@
+{
+  "name": "Manga Translator & Reader",
+  "description": "Visualize and translate manga from ZIP files using AI. Upload a ZIP, browse pages, and get instant translations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
