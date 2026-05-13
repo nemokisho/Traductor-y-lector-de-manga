@@ -199,6 +199,56 @@ async function startServer() {
     }
   });
 
+  // API Routes para Gestión de Almacenamiento
+  app.get("/api/storage/stats", (req, res) => {
+    try {
+      const dbStats = sqlite.prepare("SELECT COUNT(*) as count, SUM(file_size) as total_size FROM manga").get() as any;
+      
+      let diskSize = 0;
+      if (fs.existsSync(mangasDir)) {
+        const files = fs.readdirSync(mangasDir);
+        files.forEach(file => {
+          const stats = fs.statSync(path.join(mangasDir, file));
+          diskSize += stats.size;
+        });
+      }
+
+      res.json({
+        database: {
+          count: dbStats.count || 0,
+          totalSize: dbStats.total_size || 0
+        },
+        disk: {
+          totalSize: diskSize,
+          path: mangasDir
+        }
+      });
+    } catch (error) {
+      console.error("Error getting storage stats:", error);
+      res.status(500).json({ error: "Error al obtener estadísticas de almacenamiento" });
+    }
+  });
+
+  app.post("/api/storage/clear", (req, res) => {
+    try {
+      // Clear DB
+      sqlite.prepare("DELETE FROM manga").run();
+      
+      // Clear Files
+      if (fs.existsSync(mangasDir)) {
+        const files = fs.readdirSync(mangasDir);
+        files.forEach(file => {
+          fs.unlinkSync(path.join(mangasDir, file));
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing storage:", error);
+      res.status(500).json({ error: "Error al limpiar almacenamiento" });
+    }
+  });
+
   // Configuración de Vite como middleware
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

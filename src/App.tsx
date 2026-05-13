@@ -25,7 +25,9 @@ import {
   Search,
   RefreshCw,
   Library,
-  Trash2
+  Trash2,
+  Settings,
+  HardDrive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -72,6 +74,9 @@ export default function App() {
   const [readingMode, setReadingMode] = useState<'paged' | 'cascade'>('paged');
   const [eyeProtection, setEyeProtection] = useState(0); // 0 to 100
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [storageStats, setStorageStats] = useState<any>(null);
+  const [isClearingLibrary, setIsClearingLibrary] = useState(false);
 
   const getScaleClass = () => {
     if (viewMode === 'fit') return "max-h-[calc(100vh-8rem)] max-w-full w-auto object-contain";
@@ -488,6 +493,41 @@ export default function App() {
     setView('home');
   };
 
+  const fetchStorageStats = async () => {
+    try {
+      const res = await fetch("/api/storage/stats");
+      const data = await res.json();
+      setStorageStats(data);
+    } catch (e) {
+      console.error("Error fetching stats:", e);
+    }
+  };
+
+  const handleClearLibrary = async () => {
+    if (!confirm("¿Estás SEGURO de que quieres eliminar TODA la biblioteca? Esta acción no se puede deshacer.")) return;
+    
+    setIsClearingLibrary(true);
+    try {
+      const res = await fetch("/api/storage/clear", { method: "POST" });
+      if (res.ok) {
+        fetchLibrary();
+        fetchStorageStats();
+        alert("Biblioteca eliminada con éxito.");
+      }
+    } catch (e) {
+      console.error("Error clearing library:", e);
+      alert("Error al eliminar la biblioteca.");
+    } finally {
+      setIsClearingLibrary(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showStorageSettings) {
+      fetchStorageStats();
+    }
+  }, [showStorageSettings]);
+
   if (view === 'home') {
     return (
       <div className="min-h-screen bg-[#050505] text-zinc-100 flex overflow-hidden relative">
@@ -623,7 +663,112 @@ export default function App() {
               </div>
             )}
           </div>
+
+          <div className="mt-auto px-4 pb-6 space-y-2">
+            <p className="px-4 text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Sistema</p>
+            <button 
+              onClick={() => setShowStorageSettings(true)}
+              className={cn(
+                "w-full text-left px-4 py-3 rounded-xl transition-all text-sm font-medium flex items-center gap-3",
+                showStorageSettings ? "bg-zinc-800 text-indigo-400" : "text-zinc-500 hover:text-white"
+              )}
+            >
+              <HardDrive className="w-4 h-4" />
+              Almacenamiento
+            </button>
+          </div>
         </div>
+
+        {/* Storage Settings Modal */}
+        <AnimatePresence>
+          {showStorageSettings && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-6"
+              onClick={() => setShowStorageSettings(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-[#0a0a0a] border border-zinc-800 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl"
+              >
+                <div className="p-8 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
+                        <HardDrive className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <h3 className="text-xl font-bold text-white">Almacenamiento</h3>
+                    </div>
+                    <button onClick={() => setShowStorageSettings(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 transition-all">
+                      <History className="w-5 h-5 rotate-45" />
+                    </button>
+                  </div>
+
+                  {storageStats ? (
+                    <div className="space-y-6">
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-zinc-400">Archivos Guardados:</span>
+                          <span className="text-sm font-bold text-white">{storageStats.database.count} mangas</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-zinc-400">Tamaño del Servidor:</span>
+                          <span className="text-sm font-bold text-emerald-400">{formatSize(storageStats.disk.totalSize)}</span>
+                        </div>
+                        <div className="pt-4 border-t border-zinc-800">
+                          <p className="text-[10px] text-zinc-500 uppercase font-black mb-2">UBICACIÓN DEL SERVIDOR</p>
+                          <code className="text-[10px] text-zinc-600 font-mono bg-black/50 px-2 py-1 rounded block truncate">
+                            {storageStats.disk.path}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <p className="text-[10px] text-zinc-500 uppercase font-black px-1">ACCIONES DE MANTENIMIENTO</p>
+                        <button 
+                          onClick={handleClearLibrary}
+                          disabled={isClearingLibrary}
+                          className="w-full flex items-center justify-between p-4 bg-red-500/10 hover:bg-red-500 rounded-3xl group transition-all"
+                        >
+                          <div className="text-left">
+                            <p className="text-sm border-0 font-bold text-red-500 group-hover:text-white transition-colors">Vaciar Biblioteca</p>
+                            <p className="text-[10px] text-red-500/60 group-hover:text-white/60 transition-colors">Elimina todos los archivos y datos</p>
+                          </div>
+                          {isClearingLibrary ? <Loader2 className="w-5 h-5 animate-spin text-white" /> : <Trash2 className="w-5 h-5 text-red-500 group-hover:text-white" />}
+                        </button>
+                        
+                        <button 
+                          onClick={() => fetchStorageStats()}
+                          className="w-full flex items-center justify-between p-4 bg-zinc-900 hover:bg-zinc-800 rounded-3xl transition-all"
+                        >
+                          <div className="text-left">
+                            <p className="text-sm font-bold text-white">Actualizar Estadísticas</p>
+                            <p className="text-[10px] text-zinc-500">Recalcular espacio utilizado</p>
+                          </div>
+                          <RefreshCw className="w-5 h-5 text-zinc-500" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                      <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                      <p className="text-sm text-zinc-500">Calculando espacio...</p>
+                    </div>
+                  )}
+
+                  <p className="text-[9px] text-zinc-600 text-center leading-relaxed">
+                    Los archivos se almacenan en el servidor para optimizar el rendimiento y evitar que la base de datos se vuelva lenta con el tiempo.
+                  </p>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Top Bar Library */}
